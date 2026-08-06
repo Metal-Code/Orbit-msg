@@ -1,7 +1,7 @@
-import {ApiError} from '../utils/ApiError.js'
-import {asyncHandler} from '../utils/asyncHandler.js'
-import {config} from '../core/config.js'
-import jwt from jsonwebtoken
+import {ApiError} from "../utils/ApiError.js"
+import { asyncHandler } from "../utils/asyncHandler.js";
+import {config} from "../core/config.js"
+import jwt from "jsonwebtoken";
 
 
 export const authMiddleware = asyncHandler(async(req, res, next) => {
@@ -13,13 +13,11 @@ export const authMiddleware = asyncHandler(async(req, res, next) => {
     const token = authHeader.split(" ")[1];
 
     let payload;
-    try 
-    {
-        payload = jwt.verify(token, config.jwtSecret)
-    }
-    catch(err)
-    {
-        throw new ApiError(401, `Invalid or expired token`)
+    try {
+        payload = jwt.verify(token, config.jwtSecret);
+    } catch (err) {
+        console.error("JWT verify failed:", err.message); // temporary debug line
+        throw new ApiError(401, "Invalid or expired token");
     }
 
     if (payload.type !== `access`)
