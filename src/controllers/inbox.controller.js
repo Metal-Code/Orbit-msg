@@ -5,15 +5,33 @@ import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import mongoose from "mongoose";
-
+import {getUserInfo} from "../services/user.service.js"
+import { getConversationOrFail } from "../services/conversationAccess.service.js";
+import { createMessage, markMessagesAsRead } from "../services/message.service.js";
 
 export const getConversations = asyncHandler(async (req, res) => {
   const conversations = await Conversation.find({
     participantIds: req.userId,
   }).sort({ lastMessageAt: -1 });
 
+  const enriched = await Promise.all(
+    conversations.map(async (conversation) => {
+      const otherUserId =
+        conversation.participantOneId === req.userId
+          ? conversation.participantTwoId
+          : conversation.participantOneId;
+
+      const otherUser = await getUserInfo(otherUserId);
+
+      return {
+        ...conversation.toObject(),
+        otherUser,
+      };
+    })
+  );
+
   res.status(200).json(
-    new ApiResponse(200, conversations, "Conversations fetched")
+    new ApiResponse(200, enriched, "Conversations fetched")
   );
 });
 
@@ -36,19 +54,7 @@ export const openConversation = asyncHandler(async (req, res) => {
 export const getMessages = asyncHandler(async (req, res) => {
   const { conversationId } = req.params;
 
-  if (!mongoose.Types.ObjectId.isValid(conversationId)) {
-    throw new ApiError(400, "Invalid conversation ID");
-    }
-
-  const conversation = await Conversation.findById(conversationId);
-
-  if (!conversation) {
-    throw new ApiError(404, "Conversation not found");
-  }
-
-  if (!conversation.participantIds.includes(req.userId)) {
-    throw new ApiError(403, "You are not part of this conversation");
-  }
+  await getConversationOrFail(conversationId, req.userId);
 
   const messages = await Message.find({ conversationId }).sort({ createdAt: 1 });
 
@@ -62,36 +68,20 @@ export const sendMessage = asyncHandler(async (req, res) => {
   const { conversationId } = req.params;
   const { content } = req.body;
 
-  if (!content || !content.trim()) {
-    throw new ApiError(400, "Message content cannot be empty");
-  }
-
-  if(!mongoose.Types.ObjectId.isValid(conversationId))
-    {
-        throw new ApiError(400, "Invalid conversation ID");
-    }
-
-  const conversation = await Conversation.findById(conversationId);
-
-  if (!conversation) {
-    throw new ApiError(404, "Conversation not found");
-  }
-
-  if (!conversation.participantIds.includes(req.userId)) {
-    throw new ApiError(403, "You are not part of this conversation");
-  }
-
-  const message = await Message.create({
-    conversationId,
-    senderId: req.userId,
-    content: content.trim(),
-  });
-
-  conversation.lastMessageAt = message.createdAt;
-  conversation.lastPreview = content.trim().slice(0, 100);
-  await conversation.save();
+  const { message } = await createMessage(conversationId, req.userId, content);
 
   res.status(201).json(
     new ApiResponse(201, message, "Message sent")
+  );
+});
+
+
+export const markAsRead = asyncHandler(async (req, res) => {
+  const { conversationId } = req.params;
+
+  await markMessagesAsRead(conversationId, req.userId);
+
+  res.status(200).json(
+    new ApiResponse(200, null, "Messages marked as read")
   );
 });

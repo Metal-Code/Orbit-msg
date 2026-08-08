@@ -5,6 +5,7 @@ import {
   openConversation,
   getMessages,
   sendMessage,
+  markAsRead,
 } from "../controllers/inbox.controller.js";
 
 const router = Router();
@@ -15,5 +16,6 @@ router.get("/", getConversations);
 router.post("/conversations", openConversation);
 router.get("/:conversationId/messages", getMessages);
 router.post("/:conversationId/messages", sendMessage);
+router.patch("/:conversationId/read", markAsRead);
 
 export default router;
