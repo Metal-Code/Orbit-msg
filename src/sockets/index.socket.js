@@ -5,7 +5,7 @@ import { registerMessageHandlers } from "./message.socket.js";
 export const initSocket = (httpServer) => {
   const io = new Server(httpServer, {
     cors: {
-      origin: "*", // tighten this later once Nginx/production origin is known
+      origin: "https://orbit-new-frontend.vercel.app", 
     },
   });
 
